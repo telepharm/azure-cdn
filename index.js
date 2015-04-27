@@ -15,6 +15,8 @@ _Object$defineProperty(exports, '__esModule', {
 });
 
 exports['default'] = upload;
+//inspired by:
+//https://github.com/bestander/deploy-azure-cdn
 
 var _azure = require('azure-storage');
 
@@ -51,7 +53,7 @@ function getFileSizeAsync(path) {
 }
 
 function gzipAndCompareAsync(fileName, size) {
-  var gzip, tmp, file, out, compressedSize;
+  var gzip, tmp, file, out, writing, compressedSize;
   return _regeneratorRuntime.async(function gzipAndCompareAsync$(context$1$0) {
     while (1) switch (context$1$0.prev = context$1$0.next) {
       case 0:
@@ -61,36 +63,37 @@ function gzipAndCompareAsync(fileName, size) {
         tmp = fileName + '.gz';
         file = fs.createReadStream(fileName);
         out = fs.createWriteStream(tmp);
-
-        file.pipe(gzip).pipe(out);
-        context$1$0.next = 7;
-        return new _Promise2['default'](function (res, rej) {
+        writing = new _Promise2['default'](function (res, rej) {
           gzip.once('error', rej);
           out.once('close', res);
         });
 
-      case 7:
-        context$1$0.next = 9;
+        file.pipe(gzip).pipe(out);
+        context$1$0.next = 8;
+        return writing;
+
+      case 8:
+        context$1$0.next = 10;
         return getFileSizeAsync(tmp);
 
-      case 9:
+      case 10:
         compressedSize = context$1$0.sent;
 
         if (!(compressedSize > size)) {
-          context$1$0.next = 14;
+          context$1$0.next = 15;
           break;
         }
 
-        context$1$0.next = 13;
+        context$1$0.next = 14;
         return fs.unlinkAsync(tmp);
 
-      case 13:
+      case 14:
         return context$1$0.abrupt('return', fileName);
 
-      case 14:
+      case 15:
         return context$1$0.abrupt('return', tmp);
 
-      case 15:
+      case 16:
       case 'end':
         return context$1$0.stop();
     }
@@ -125,68 +128,67 @@ function upload(_ref) {
     while (1) switch (context$1$0.prev = context$1$0.next) {
       case 0:
         processFileAsync = function processFileAsync(file) {
-          var fileName, zipped, relativePath, remoteFileName, meta, size;
+          var fileName, zipped, remoteFileName, meta, size;
           return _regeneratorRuntime.async(function processFileAsync$(context$2$0) {
             while (1) switch (context$2$0.prev = context$2$0.next) {
               case 0:
                 fileName = file.path;
                 zipped = false;
-                relativePath = _path2['default'].relative(file.cwd, file.path);
-                remoteFileName = _path2['default'].join(folder, relativePath);
+                remoteFileName = _path2['default'].join(folder, _path2['default'].relative(file.cwd, file.path));
                 meta = _Object$assign({}, metadata);
-                context$2$0.next = 7;
+                context$2$0.next = 6;
                 return getFileSizeAsync(fileName);
 
-              case 7:
+              case 6:
                 size = context$2$0.sent;
 
                 if (size) {
-                  context$2$0.next = 10;
+                  context$2$0.next = 9;
                   break;
                 }
 
-                return context$2$0.abrupt('return', null);
+                return context$2$0.abrupt('return');
 
-              case 10:
+              case 9:
                 meta.contentType = _mime2['default'].lookup(fileName);
 
                 if (!zip) {
-                  context$2$0.next = 15;
+                  context$2$0.next = 14;
                   break;
                 }
 
-                context$2$0.next = 14;
+                context$2$0.next = 13;
                 return gzipAndCompareAsync(fileName, size);
 
-              case 14:
+              case 13:
                 fileName = context$2$0.sent;
 
-              case 15:
+              case 14:
                 if (fileName !== file.path) {
                   zipped = true;
                   meta.contentEncoding = 'gzip';
                 }
 
                 if (!test) {
-                  context$2$0.next = 20;
+                  context$2$0.next = 19;
                   break;
                 }
 
                 logger('Uploaded ' + remoteFileName + ' as a ' + meta.contentEncoding + ' file');
-                context$2$0.next = 24;
+                context$2$0.next = 23;
                 break;
 
-              case 20:
+              case 19:
                 logger('Uploading ' + remoteFileName + ' as a ' + meta.contentEncoding + ' file');
-                context$2$0.next = 23;
+                context$2$0.next = 22;
                 return service.createBlockBlobFromLocalFileAsync(container, remoteFileName, fileName, meta)['finally'](function () {
                   return zipped && fs.unlinkAsync(fileName);
                 });
 
-              case 23:
+              case 22:
                 logger('Uploaded ' + remoteFileName + ' as a ' + meta.contentEncoding + ' file');
 
-              case 24:
+              case 23:
               case 'end':
                 return context$2$0.stop();
             }

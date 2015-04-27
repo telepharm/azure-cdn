@@ -1,3 +1,5 @@
+//inspired by:
+//https://github.com/bestander/deploy-azure-cdn
 import azure from 'azure-storage';
 import mime from 'mime';
 import fsSync from 'fs';
@@ -20,11 +22,12 @@ async function gzipAndCompareAsync(fileName, size) {
   let tmp = fileName + '.gz';
   let file = fs.createReadStream(fileName);
   let out = fs.createWriteStream(tmp);
-  file.pipe(gzip).pipe(out);
-  await new Promise((res, rej) => {
-      gzip.once('error', rej);
-      out.once('close',res);
+  let writing = new Promise((res, rej) => {
+    gzip.once('error', rej);
+    out.once('close',res);
   });
+  file.pipe(gzip).pipe(out);
+  await writing;
   let compressedSize = await getFileSizeAsync(tmp);
   if (compressedSize > size) {
     await fs.unlinkAsync(tmp);
@@ -62,11 +65,10 @@ export default async function upload({
   async function processFileAsync (file) {
     let fileName = file.path;
     let zipped = false;
-    let relativePath = path.relative(file.cwd, file.path);
-    let remoteFileName = path.join(folder, relativePath);
+    let remoteFileName = path.join(folder, path.relative(file.cwd, file.path));
     let meta = Object.assign({}, metadata);
     let size = await getFileSizeAsync(fileName);
-    if (!size) return null;
+    if (!size) return;
     meta.contentType = mime.lookup(fileName);
     if (zip) fileName = await gzipAndCompareAsync(fileName, size);
     if (fileName !== file.path) {
