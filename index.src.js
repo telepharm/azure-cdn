@@ -48,20 +48,20 @@ export default async function upload({
   zip = false,
   metadata = {cacheControl: 'public, max-age=31556926'},
   test = false,
-}) {
+  }) {
   if (!container) throw new Error('Usage error: container must be set to the container name');
   logger = log || logger;
   let service = azure.createBlobService(...blobService);
   await service.createContainerIfNotExistsAsync(container, containerOptions);
   if (erase) {
-    let blobs = await service.listBlobsSegmentedWithPrefixAsync(container, folder);
+    let blobs = (await service.listBlobsSegmentedWithPrefixAsync(container, folder, null, null))[0];
     await Promise.all(blobs.entries.map(blob => test
-        ? logger(`deleted ${blob.name}`)
-        : service.deleteBlobAsync(container, blob.name)
-          .then(() => logger(`deleted ${blob.name}`))));
+      ? logger(`deleted ${blob.name}`)
+      : service.deleteBlobAsync(container, blob.name)
+      .then(() => logger(`deleted ${blob.name}`))));
   }
   if (!files.length) return;
-
+  logger(`Processing ${files.length} files (${concurrency} concurrently).`);
   async function processFileAsync (file) {
     let fileName = file.path;
     let zipped = false;
@@ -77,12 +77,13 @@ export default async function upload({
     }
     if (test) {
       logger(`Uploaded ${remoteFileName} as a ${meta.contentEncoding} file`);
+      if (zipped) await fs.unlinkAsync(fileName);
     } else {
       logger(`Uploading ${remoteFileName} as a ${meta.contentEncoding} file`);
       await service.createBlockBlobFromLocalFileAsync(container, remoteFileName, fileName, meta)
-              .finally(() => zipped && fs.unlinkAsync(fileName));
+        .finally(() => zipped && fs.unlinkAsync(fileName));
       logger(`Uploaded ${remoteFileName} as a ${meta.contentEncoding} file`);
     }
   }
-  await Bluebird.map(files, processFileAsync, {concurrency});
+  await Promise.map(files, processFileAsync, {concurrency});
 }

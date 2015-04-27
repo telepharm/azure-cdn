@@ -170,25 +170,35 @@ function upload(_ref) {
                 }
 
                 if (!test) {
-                  context$2$0.next = 19;
+                  context$2$0.next = 22;
                   break;
                 }
 
                 logger('Uploaded ' + remoteFileName + ' as a ' + meta.contentEncoding + ' file');
-                context$2$0.next = 23;
+
+                if (!zipped) {
+                  context$2$0.next = 20;
+                  break;
+                }
+
+                context$2$0.next = 20;
+                return fs.unlinkAsync(fileName);
+
+              case 20:
+                context$2$0.next = 26;
                 break;
 
-              case 19:
+              case 22:
                 logger('Uploading ' + remoteFileName + ' as a ' + meta.contentEncoding + ' file');
-                context$2$0.next = 22;
+                context$2$0.next = 25;
                 return service.createBlockBlobFromLocalFileAsync(container, remoteFileName, fileName, meta)['finally'](function () {
                   return zipped && fs.unlinkAsync(fileName);
                 });
 
-              case 22:
+              case 25:
                 logger('Uploaded ' + remoteFileName + ' as a ' + meta.contentEncoding + ' file');
 
-              case 23:
+              case 26:
               case 'end':
                 return context$2$0.stop();
             }
@@ -215,10 +225,10 @@ function upload(_ref) {
         }
 
         context$1$0.next = 10;
-        return service.listBlobsSegmentedWithPrefixAsync(container, folder);
+        return service.listBlobsSegmentedWithPrefixAsync(container, folder, null, null);
 
       case 10:
-        blobs = context$1$0.sent;
+        blobs = context$1$0.sent[0];
         context$1$0.next = 13;
         return _Promise2['default'].all(blobs.entries.map(function (blob) {
           return test ? logger('deleted ' + blob.name) : service.deleteBlobAsync(container, blob.name).then(function () {
@@ -235,10 +245,11 @@ function upload(_ref) {
         return context$1$0.abrupt('return');
 
       case 15:
-        context$1$0.next = 17;
-        return Bluebird.map(files, processFileAsync, { concurrency: concurrency });
+        logger('Processing ' + files.length + ' files (' + concurrency + ' concurrently).');
+        context$1$0.next = 18;
+        return _Promise2['default'].map(files, processFileAsync, { concurrency: concurrency });
 
-      case 17:
+      case 18:
       case 'end':
         return context$1$0.stop();
     }
