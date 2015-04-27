@@ -7,12 +7,23 @@ import zlib from 'zlib';
 import path from 'path';
 import Promise from 'bluebird';
 
+let map = Promise.map;
 let fs = Promise.promisifyAll(fsSync);
 Promise.promisifyAll(azure.BlobService.prototype);
 let logger = console.log.bind(console);
 
 function getFileSizeAsync (path) {
   return fs.statAsync(path).then(stat => !stat.isDirectory() && stat.size);
+}
+
+async function eraseBlobsAsync (service, container, folder, concurrency, test) {
+  logger('Erasing records...');
+  let blobs = (await service.listBlobsSegmentedWithPrefixAsync(container, folder, null, null))[0];
+  await map(blobs.entries, blob => test
+    ? logger(`deleted* ${blob.name}`)
+    : service.deleteBlobAsync(container, blob.name)
+      .then(() => logger(`deleted ${blob.name}`))
+  , {concurrency});
 }
 
 async function gzipAndCompareAsync(fileName, size) {
@@ -23,8 +34,8 @@ async function gzipAndCompareAsync(fileName, size) {
   let file = fs.createReadStream(fileName);
   let out = fs.createWriteStream(tmp);
   let writing = new Promise((res, rej) => {
+    out.once('close', res);
     gzip.once('error', rej);
-    out.once('close',res);
   });
   file.pipe(gzip).pipe(out);
   await writing;
@@ -50,18 +61,12 @@ export default async function upload({
   test = false,
   }) {
   if (!container) throw new Error('Usage error: container must be set to the container name');
-  logger = log || logger;
+  logger = log;
   let service = azure.createBlobService(...blobService);
   await service.createContainerIfNotExistsAsync(container, containerOptions);
-  if (erase) {
-    let blobs = (await service.listBlobsSegmentedWithPrefixAsync(container, folder, null, null))[0];
-    await Promise.all(blobs.entries.map(blob => test
-      ? logger(`deleted ${blob.name}`)
-      : service.deleteBlobAsync(container, blob.name)
-      .then(() => logger(`deleted ${blob.name}`))));
-  }
+  console.log(`Processing ${files.length} files (${concurrency} concurrently).`);
+  if (erase) await eraseBlobsAsync(service, container, folder, concurrency, test);
   if (!files.length) return;
-  logger(`Processing ${files.length} files (${concurrency} concurrently).`);
   async function processFileAsync (file) {
     let fileName = file.path;
     let zipped = false;
@@ -85,5 +90,5 @@ export default async function upload({
       logger(`Uploaded ${remoteFileName} as a ${meta.contentEncoding} file`);
     }
   }
-  await Promise.map(files, processFileAsync, {concurrency});
+  await map(files, processFileAsync, {concurrency});
 }

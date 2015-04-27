@@ -42,6 +42,7 @@ var _Promise = require('bluebird');
 
 var _Promise2 = _interopRequireDefault(_Promise);
 
+var map = _Promise2['default'].map;
 var fs = _Promise2['default'].promisifyAll(_fsSync2['default']);
 _Promise2['default'].promisifyAll(_azure2['default'].BlobService.prototype);
 var logger = console.log.bind(console);
@@ -50,6 +51,31 @@ function getFileSizeAsync(path) {
   return fs.statAsync(path).then(function (stat) {
     return !stat.isDirectory() && stat.size;
   });
+}
+
+function eraseBlobsAsync(service, container, folder, concurrency, test) {
+  var blobs;
+  return _regeneratorRuntime.async(function eraseBlobsAsync$(context$1$0) {
+    while (1) switch (context$1$0.prev = context$1$0.next) {
+      case 0:
+        logger('Erasing records...');
+        context$1$0.next = 3;
+        return service.listBlobsSegmentedWithPrefixAsync(container, folder, null, null);
+
+      case 3:
+        blobs = context$1$0.sent[0];
+        context$1$0.next = 6;
+        return map(blobs.entries, function (blob) {
+          return test ? logger('deleted* ' + blob.name) : service.deleteBlobAsync(container, blob.name).then(function () {
+            return logger('deleted ' + blob.name);
+          });
+        }, { concurrency: concurrency });
+
+      case 6:
+      case 'end':
+        return context$1$0.stop();
+    }
+  }, null, this);
 }
 
 function gzipAndCompareAsync(fileName, size) {
@@ -64,8 +90,8 @@ function gzipAndCompareAsync(fileName, size) {
         file = fs.createReadStream(fileName);
         out = fs.createWriteStream(tmp);
         writing = new _Promise2['default'](function (res, rej) {
-          gzip.once('error', rej);
           out.once('close', res);
+          gzip.once('error', rej);
         });
 
         file.pipe(gzip).pipe(out);
@@ -123,7 +149,7 @@ function upload(_ref) {
   var metadata = _ref$metadata === undefined ? { cacheControl: 'public, max-age=31556926' } : _ref$metadata;
   var _ref$test = _ref.test;
   var test = _ref$test === undefined ? false : _ref$test;
-  var service, blobs, processFileAsync;
+  var service, processFileAsync;
   return _regeneratorRuntime.async(function upload$(context$1$0) {
     while (1) switch (context$1$0.prev = context$1$0.next) {
       case 0:
@@ -213,43 +239,35 @@ function upload(_ref) {
         throw new Error('Usage error: container must be set to the container name');
 
       case 3:
-        logger = log || logger;
+        logger = log;
         service = _azure2['default'].createBlobService.apply(_azure2['default'], _toConsumableArray(blobService));
         context$1$0.next = 7;
         return service.createContainerIfNotExistsAsync(container, containerOptions);
 
       case 7:
+        console.log('Processing ' + files.length + ' files (' + concurrency + ' concurrently).');
+
         if (!erase) {
-          context$1$0.next = 13;
+          context$1$0.next = 11;
           break;
         }
 
-        context$1$0.next = 10;
-        return service.listBlobsSegmentedWithPrefixAsync(container, folder, null, null);
+        context$1$0.next = 11;
+        return eraseBlobsAsync(service, container, folder, concurrency, test);
 
-      case 10:
-        blobs = context$1$0.sent[0];
-        context$1$0.next = 13;
-        return _Promise2['default'].all(blobs.entries.map(function (blob) {
-          return test ? logger('deleted ' + blob.name) : service.deleteBlobAsync(container, blob.name).then(function () {
-            return logger('deleted ' + blob.name);
-          });
-        }));
-
-      case 13:
+      case 11:
         if (files.length) {
-          context$1$0.next = 15;
+          context$1$0.next = 13;
           break;
         }
 
         return context$1$0.abrupt('return');
 
-      case 15:
-        logger('Processing ' + files.length + ' files (' + concurrency + ' concurrently).');
-        context$1$0.next = 18;
-        return _Promise2['default'].map(files, processFileAsync, { concurrency: concurrency });
+      case 13:
+        context$1$0.next = 15;
+        return map(files, processFileAsync, { concurrency: concurrency });
 
-      case 18:
+      case 15:
       case 'end':
         return context$1$0.stop();
     }
