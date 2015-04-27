@@ -7,6 +7,7 @@ import zlib from 'zlib';
 import path from 'path';
 import Promise from 'bluebird';
 
+let LinearRetryPolicyFilter = azure.LinearRetryPolicyFilter;
 let map = Promise.map;
 let fs = Promise.promisifyAll(fsSync);
 Promise.promisifyAll(azure.BlobService.prototype);
@@ -62,7 +63,8 @@ export default async function upload({
   }) {
   if (!container) throw new Error('Usage error: container must be set to the container name');
   logger = log;
-  let service = azure.createBlobService(...blobService);
+  let service = azure.createBlobService(...blobService)
+        .withFilter(new LinearRetryPolicyFilter(100, 5));
   await service.createContainerIfNotExistsAsync(container, containerOptions);
   console.log(`Processing ${files.length} files (${concurrency} concurrently).`);
   if (erase) await eraseBlobsAsync(service, container, folder, concurrency, test);
@@ -81,7 +83,7 @@ export default async function upload({
       meta.contentEncoding = 'gzip';
     }
     if (test) {
-      logger(`Uploaded ${remoteFileName} as a ${meta.contentEncoding} file`);
+      logger(`Uploaded ${remoteFileName} as a ${meta.contentEncoding || ''} file`);
       if (zipped) await fs.unlinkAsync(fileName);
     } else {
       logger(`Uploading ${remoteFileName} as a ${meta.contentEncoding} file`);

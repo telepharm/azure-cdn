@@ -1,6 +1,6 @@
 {
   "name": "azure-cdn",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Deploy assets to an azure cdn (blob)",
   "main": "index.js",
   "scripts": {

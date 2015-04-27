@@ -42,6 +42,7 @@ var _Promise = require('bluebird');
 
 var _Promise2 = _interopRequireDefault(_Promise);
 
+var LinearRetryPolicyFilter = _azure2['default'].LinearRetryPolicyFilter;
 var map = _Promise2['default'].map;
 var fs = _Promise2['default'].promisifyAll(_fsSync2['default']);
 _Promise2['default'].promisifyAll(_azure2['default'].BlobService.prototype);
@@ -200,7 +201,7 @@ function upload(_ref) {
                   break;
                 }
 
-                logger('Uploaded ' + remoteFileName + ' as a ' + meta.contentEncoding + ' file');
+                logger('Uploaded ' + remoteFileName + ' as a ' + (meta.contentEncoding || '') + ' file');
 
                 if (!zipped) {
                   context$2$0.next = 20;
@@ -240,7 +241,7 @@ function upload(_ref) {
 
       case 3:
         logger = log;
-        service = _azure2['default'].createBlobService.apply(_azure2['default'], _toConsumableArray(blobService));
+        service = _azure2['default'].createBlobService.apply(_azure2['default'], _toConsumableArray(blobService)).withFilter(new LinearRetryPolicyFilter(100, 5));
         context$1$0.next = 7;
         return service.createContainerIfNotExistsAsync(container, containerOptions);
 
