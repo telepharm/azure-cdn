@@ -7,26 +7,27 @@ import zlib from 'zlib';
 import path from 'path';
 import Promise from 'bluebird';
 
-let LinearRetryPolicyFilter = azure.LinearRetryPolicyFilter;
-let map = Promise.map;
 let fs = Promise.promisifyAll(fsSync);
 Promise.promisifyAll(azure.BlobService.prototype);
-let logger = console.log.bind(console);
+let LinearRetryPolicyFilter = azure.LinearRetryPolicyFilter;
+let map = Promise.map;
 
+//
 function getFileSizeAsync (path) {
   return fs.statAsync(path).then(stat => !stat.isDirectory() && stat.size);
 }
 
-async function eraseBlobsAsync (service, container, folder, concurrency, test) {
-  logger('Erasing records...');
-  let blobs = (await service.listBlobsSegmentedWithPrefixAsync(container, folder, null, null))[0];
+//Erase all blobs under folder
+async function eraseBlobsAsync (service, container, folder, concurrency, test, log) {
+  let blobs = (await service.listBlobsSegmentedWithPrefixAsync(container, folder, null))[0];
   await map(blobs.entries, blob => test
-    ? logger(`deleted* ${blob.name}`)
+    ? log(`deleted* ${blob.name}`)
     : service.deleteBlobAsync(container, blob.name)
-      .then(() => logger(`deleted ${blob.name}`))
+      .then(() => log(`deleted ${blob.name}`))
   , {concurrency});
 }
 
+//gzip fileName and return file name for smallest version
 async function gzipAndCompareAsync(fileName, size) {
   let gzip = zlib.createGzip({
     level: 9
@@ -48,28 +49,27 @@ async function gzipAndCompareAsync(fileName, size) {
   return tmp;
 }
 
+
 export default async function upload({
-  files = [],
-  log = logger,
-  blobService = [],
-  container = null,
-  containerOptions = {publicAccessLevel: 'blob'},
-  folder = '',
-  erase = true,
-  concurrency = 10,
-  zip = false,
-  metadata = {cacheControl: 'public, max-age=31556926'},
-  test = false,
-  }) {
+    files = [],
+    log = function () {},
+    blobService = [],
+    container = null,
+    containerOptions = {publicAccessLevel: 'blob'},
+    folder = '',
+    erase = true,
+    concurrency = 10,
+    zip = false,
+    metadata = {cacheControl: 'public, max-age=31556926'},
+    test = false,}) {
   if (!container) throw new Error('Usage error: container must be set to the container name');
-  logger = log;
   let service = azure.createBlobService(...blobService)
         .withFilter(new LinearRetryPolicyFilter(100, 5));
   await service.createContainerIfNotExistsAsync(container, containerOptions);
-  console.log(`Processing ${files.length} files (${concurrency} concurrently).`);
-  if (erase) await eraseBlobsAsync(service, container, folder, concurrency, test);
+  log(`Processing ${files.length} files (${concurrency} concurrently).`);
+  if (erase) await eraseBlobsAsync(service, container, folder, concurrency, test, log);
   if (!files.length) return;
-  async function processFileAsync (file) {
+  return map(files, async function processFileAsync (file) {
     let fileName = file.path;
     let zipped = false;
     let remoteFileName = path.join(folder, path.relative(file.cwd, file.path));
@@ -82,15 +82,10 @@ export default async function upload({
       zipped = true;
       meta.contentEncoding = 'gzip';
     }
-    if (test) {
-      logger(`Uploaded ${remoteFileName} as a ${meta.contentEncoding || ''} file`);
-      if (zipped) await fs.unlinkAsync(fileName);
-    } else {
-      logger(`Uploading ${remoteFileName} as a ${meta.contentEncoding} file`);
-      await service.createBlockBlobFromLocalFileAsync(container, remoteFileName, fileName, meta)
-        .finally(() => zipped && fs.unlinkAsync(fileName));
-      logger(`Uploaded ${remoteFileName} as a ${meta.contentEncoding} file`);
-    }
-  }
-  await map(files, processFileAsync, {concurrency});
+    log(`Uploading ${remoteFileName}`);
+    if (!test) await service.createBlockBlobFromLocalFileAsync(container, remoteFileName, fileName, meta)
+                .finally(() => zipped && fs.unlinkAsync(fileName)); // always unlink tmp file
+    if (test && zipped) await fs.unlinkAsync(fileName);
+    log(`Uploaded ${remoteFileName}`);
+  }, {concurrency});
 }
