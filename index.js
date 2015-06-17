@@ -1,12 +1,14 @@
+//inspired by:
+//https://github.com/bestander/deploy-azure-cdn
 'use strict';
 
 var _toConsumableArray = require('babel-runtime/helpers/to-consumable-array')['default'];
 
 var _Object$defineProperty = require('babel-runtime/core-js/object/define-property')['default'];
 
-var _Object$assign = require('babel-runtime/core-js/object/assign')['default'];
-
 var _regeneratorRuntime = require('babel-runtime/regenerator')['default'];
+
+var _Object$assign = require('babel-runtime/core-js/object/assign')['default'];
 
 var _interopRequireDefault = require('babel-runtime/helpers/interop-require-default')['default'];
 
@@ -15,20 +17,18 @@ _Object$defineProperty(exports, '__esModule', {
 });
 
 exports['default'] = upload;
-//inspired by:
-//https://github.com/bestander/deploy-azure-cdn
 
-var _azure = require('azure-storage');
+var _azureStorage = require('azure-storage');
 
-var _azure2 = _interopRequireDefault(_azure);
+var _azureStorage2 = _interopRequireDefault(_azureStorage);
 
 var _mime = require('mime');
 
 var _mime2 = _interopRequireDefault(_mime);
 
-var _fsSync = require('fs');
+var _fs = require('fs');
 
-var _fsSync2 = _interopRequireDefault(_fsSync);
+var _fs2 = _interopRequireDefault(_fs);
 
 var _zlib = require('zlib');
 
@@ -38,14 +38,14 @@ var _path = require('path');
 
 var _path2 = _interopRequireDefault(_path);
 
-var _Promise = require('bluebird');
+var _bluebird = require('bluebird');
 
-var _Promise2 = _interopRequireDefault(_Promise);
+var _bluebird2 = _interopRequireDefault(_bluebird);
 
-var fs = _Promise2['default'].promisifyAll(_fsSync2['default']);
-_Promise2['default'].promisifyAll(_azure2['default'].BlobService.prototype);
-var LinearRetryPolicyFilter = _azure2['default'].LinearRetryPolicyFilter;
-var map = _Promise2['default'].map;
+var fs = _bluebird2['default'].promisifyAll(_fs2['default']);
+_bluebird2['default'].promisifyAll(_azureStorage2['default'].BlobService.prototype);
+var LinearRetryPolicyFilter = _azureStorage2['default'].LinearRetryPolicyFilter;
+var map = _bluebird2['default'].map;
 
 //
 function getFileSizeAsync(path) {
@@ -61,16 +61,16 @@ function eraseBlobsAsync(service, container, folder, concurrency, test, log) {
     while (1) switch (context$1$0.prev = context$1$0.next) {
       case 0:
         context$1$0.next = 2;
-        return service.listBlobsSegmentedWithPrefixAsync(container, folder, null);
+        return _regeneratorRuntime.awrap(service.listBlobsSegmentedWithPrefixAsync(container, folder, null));
 
       case 2:
         blobs = context$1$0.sent[0];
         context$1$0.next = 5;
-        return map(blobs.entries, function (blob) {
+        return _regeneratorRuntime.awrap(map(blobs.entries, function (blob) {
           return test ? log('deleted* ' + blob.name) : service.deleteBlobAsync(container, blob.name).then(function () {
             return log('deleted ' + blob.name);
           });
-        }, { concurrency: concurrency });
+        }, { concurrency: concurrency }));
 
       case 5:
       case 'end':
@@ -91,18 +91,18 @@ function gzipAndCompareAsync(fileName, size) {
         tmp = fileName + '.gz';
         file = fs.createReadStream(fileName);
         out = fs.createWriteStream(tmp);
-        writing = new _Promise2['default'](function (res, rej) {
+        writing = new _bluebird2['default'](function (res, rej) {
           out.once('close', res);
           gzip.once('error', rej);
         });
 
         file.pipe(gzip).pipe(out);
         context$1$0.next = 8;
-        return writing;
+        return _regeneratorRuntime.awrap(writing);
 
       case 8:
         context$1$0.next = 10;
-        return getFileSizeAsync(tmp);
+        return _regeneratorRuntime.awrap(getFileSizeAsync(tmp));
 
       case 10:
         compressedSize = context$1$0.sent;
@@ -113,7 +113,7 @@ function gzipAndCompareAsync(fileName, size) {
         }
 
         context$1$0.next = 14;
-        return fs.unlinkAsync(tmp);
+        return _regeneratorRuntime.awrap(fs.unlinkAsync(tmp));
 
       case 14:
         return context$1$0.abrupt('return', fileName);
@@ -163,9 +163,9 @@ function upload(_ref) {
         throw new Error('Usage error: container must be set to the container name');
 
       case 2:
-        service = _azure2['default'].createBlobService.apply(_azure2['default'], _toConsumableArray(blobService)).withFilter(new LinearRetryPolicyFilter(100, 5));
+        service = _azureStorage2['default'].createBlobService.apply(_azureStorage2['default'], _toConsumableArray(blobService)).withFilter(new LinearRetryPolicyFilter(100, 5));
         context$1$0.next = 5;
-        return service.createContainerIfNotExistsAsync(container, containerOptions);
+        return _regeneratorRuntime.awrap(service.createContainerIfNotExistsAsync(container, containerOptions));
 
       case 5:
         log('Processing ' + files.length + ' files (' + concurrency + ' concurrently).');
@@ -176,7 +176,7 @@ function upload(_ref) {
         }
 
         context$1$0.next = 9;
-        return eraseBlobsAsync(service, container, folder, concurrency, test, log);
+        return _regeneratorRuntime.awrap(eraseBlobsAsync(service, container, folder, concurrency, test, log));
 
       case 9:
         if (files.length) {
@@ -197,7 +197,7 @@ function upload(_ref) {
                 remoteFileName = _path2['default'].join(folder, _path2['default'].relative(file.cwd, file.path));
                 meta = _Object$assign({}, metadata);
                 context$2$0.next = 6;
-                return getFileSizeAsync(fileName);
+                return _regeneratorRuntime.awrap(getFileSizeAsync(fileName));
 
               case 6:
                 size = context$2$0.sent;
@@ -218,7 +218,7 @@ function upload(_ref) {
                 }
 
                 context$2$0.next = 13;
-                return gzipAndCompareAsync(fileName, size);
+                return _regeneratorRuntime.awrap(gzipAndCompareAsync(fileName, size));
 
               case 13:
                 fileName = context$2$0.sent;
@@ -236,9 +236,9 @@ function upload(_ref) {
                 }
 
                 context$2$0.next = 19;
-                return service.createBlockBlobFromLocalFileAsync(container, remoteFileName, fileName, meta)['finally'](function () {
+                return _regeneratorRuntime.awrap(service.createBlockBlobFromLocalFileAsync(container, remoteFileName, fileName, meta)['finally'](function () {
                   return zipped && fs.unlinkAsync(fileName);
-                });
+                }));
 
               case 19:
                 if (!(test && zipped)) {
@@ -247,7 +247,7 @@ function upload(_ref) {
                 }
 
                 context$2$0.next = 22;
-                return fs.unlinkAsync(fileName);
+                return _regeneratorRuntime.awrap(fs.unlinkAsync(fileName));
 
               case 22:
                 log('Uploaded ' + remoteFileName);
