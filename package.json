@@ -1,10 +1,10 @@
 {
   "name": "azure-cdn",
-  "version": "0.0.6",
+  "version": "1.0.0",
   "description": "Deploy assets to an azure cdn (blob)",
   "main": "index.js",
   "scripts": {
-    "prepublish": "babel index.src.js --out-file index.js --stage 1 --optional runtime",
+    "prepublish": "babel index.src.js --out-file index.js",
     "test": "mocha"
   },
   "repository": {
@@ -26,12 +26,14 @@
   },
   "homepage": "https://github.com/telepharm/azure-cdn#readme",
   "dependencies": {
-    "azure-storage": "^0.4.3",
-    "babel-runtime": "^5.5.8",
-    "bluebird": "^2.9.24",
-    "mime": "^1.3.4"
+    "azure-storage": "^2.10.0",
+    "babel-runtime": "^5.8.38",
+    "bluebird": "^3.5.1",
+    "mime": "^2.3.1"
   },
   "devDependencies": {
-    "babel": "^5.5.8"
+    "babel-cli": "^6.26.0",
+    "babel-plugin-transform-runtime": "^6.23.0",
+    "babel-preset-env": "^1.7.0"
   }
 }
